@@ -1,4 +1,4 @@
-import { ibanValid, ruleCheck, ruleRisk } from './fraud.ts';
+import { combineRisk, ibanValid, ruleCheck, ruleRisk } from './fraud.ts';
 import { FIXTURES } from './fixtures.ts';
 
 let failed = 0;
@@ -53,6 +53,13 @@ eq(
   s.some((x) => x.message.includes('time pressure')),
   true,
 );
+
+// Gemini Nano alone cannot turn a clean letter into a warning, the cloud model can
+eq('Nano alone: soft hint only', combineRisk('low', 'medium', 'on_device'), { risk: 'low', softHint: true });
+eq('Nano agrees: no hint', combineRisk('low', 'low', 'on_device'), { risk: 'low', softHint: false });
+eq('Nano + rule finding: warning', combineRisk('medium', 'high', 'on_device'), { risk: 'high', softHint: false });
+eq('Cloud may raise', combineRisk('low', 'medium', 'in_cloud'), { risk: 'medium', softHint: false });
+eq('Model never lowers rules', combineRisk('high', 'low', 'in_cloud'), { risk: 'high', softHint: false });
 
 if (failed) {
   console.error(`\n${failed} fraud test(s) failed`);

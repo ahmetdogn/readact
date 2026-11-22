@@ -40,7 +40,7 @@ import {
   type UserDates,
 } from './deadline.ts';
 import { daysUntil, deleteReminder, icsFor, listReminders, saveReminder, type Reminder } from './reminders.ts';
-import { ruleCheck, ruleRisk, type RuleFinding } from './fraud.ts';
+import { combineRisk, ruleCheck, ruleRisk, type RuleFinding } from './fraud.ts';
 import { initFirebase, isConfigured, refreshAppCheck } from './firebase.ts';
 import { occurrences, Redactor, type PiiEntity } from './pii.ts';
 import { SAMPLE_LETTER } from './sample.ts';
@@ -430,14 +430,15 @@ function fakeHtml(): string {
   const fc = state.fake;
   const rules = state.rules.filter((r) => r.severity !== 'info');
   const info = state.rules.filter((r) => r.severity === 'info');
-  const levels = { low: 0, medium: 1, high: 2 } as const;
-  const risk = (['low', 'medium', 'high'] as const)[
-    Math.max(levels[ruleRisk(state.rules)], fc ? (levels[fc.data.risk] ?? 0) : 0)
-  ];
+  const { risk, softHint } = combineRisk(ruleRisk(state.rules), fc?.data.risk ?? null, fc?.where ?? null);
   const badge = fc ? whereBadge(fc.where) : '';
   if (risk === 'low') {
-    return `<div class="fake ok"><b>Scam check:</b> ${show(fc?.data.explanation || 'No obvious warning signs found.')} ${badge}
-      ${info.length ? `<ul class="fine">${info.map((r) => `<li>${esc(r.message)}</li>`).join('')}</ul>` : ''}</div>`;
+    const hint = softHint
+      ? `<p class="fine">Gemini Nano on your device noted a few things you could double-check, but none of the hard checks (bank account, contact details, domains, payment methods) found anything:</p>
+         <ul class="fine">${(fc?.data.red_flags ?? []).map((f) => `<li>${show(f.flag)}</li>`).join('')}</ul>`
+      : '';
+    return `<div class="fake ok"><b>Scam check:</b> ${show(softHint ? 'No obvious warning signs found.' : fc?.data.explanation || 'No obvious warning signs found.')} ${badge}
+      ${info.length ? `<ul class="fine">${info.map((r) => `<li>${esc(r.message)}</li>`).join('')}</ul>` : ''}${hint}</div>`;
   }
   const flags = [
     ...rules.map(

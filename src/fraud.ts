@@ -314,3 +314,24 @@ export function ruleRisk(f: RuleFinding[]): 'low' | 'medium' | 'high' {
   if (f.filter((x) => x.severity === 'warn').length >= 1) return 'medium';
   return 'low';
 }
+
+export type Risk = 'low' | 'medium' | 'high';
+
+// Combines the code rules with the language model's view.
+// The cloud model may raise the risk above the rules. Gemini Nano is small and sometimes
+// sees red flags in perfectly normal letters, so on its own (no rule finding) it can only
+// add a soft hint, never a warning.
+export function combineRisk(
+  rules: Risk,
+  model: Risk | null,
+  where: 'on_device' | 'in_cloud' | null,
+): {
+  risk: Risk;
+  softHint: boolean;
+} {
+  const level = { low: 0, medium: 1, high: 2 } as const;
+  const names: Risk[] = ['low', 'medium', 'high'];
+  if (!model) return { risk: rules, softHint: false };
+  if (where === 'on_device' && rules === 'low') return { risk: 'low', softHint: model !== 'low' };
+  return { risk: names[Math.max(level[rules], level[model])], softHint: false };
+}
