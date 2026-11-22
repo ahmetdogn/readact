@@ -157,7 +157,7 @@ npm run lint                # type check + formatting
 
 1. Create a Firebase project and add a **Web app**. Put its config into `.env`.
 2. **AI Logic** → Get started → **Gemini Developer API**.
-3. **App Check**: create a reCAPTCHA (Fraud Defense) website key for `localhost` and your hosting domain, register the web app with it, and put the key into `VITE_RECAPTCHA_ENTERPRISE_KEY`. For local development add a debug token under _App Check → Manage debug tokens_ and set it as `VITE_APPCHECK_DEBUG_TOKEN`.
+3. **App Check**: create a reCAPTCHA (Fraud Defense) key of type **Website, score-based** – leave _“use challenges / checkbox”_ **off**, a checkbox key only returns error tokens to App Check. Add `localhost` and your hosting domains, register the web app under _App Check → Fraud Defense_ with that **site key** (not the legacy secret key), set the app risk to 0.1, and put the key into `VITE_RECAPTCHA_ENTERPRISE_KEY`. For local development add a debug token under _App Check → Manage debug tokens_ and set it as `VITE_APPCHECK_DEBUG_TOKEN`.
 4. **Authentication** → enable **Anonymous**.
 5. Create Firestore in the EU and deploy rules and Remote Config:
    ```bash

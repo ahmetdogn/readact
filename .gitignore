@@ -11,3 +11,9 @@ video/build.log
 video/.env
 video/voice-cache/
 video/out/
+
+# not part of the app (kept locally)
+video/
+docs/devpost-submission.md
+docs/thumbnail-*.png
+scripts/thumbnail.*
