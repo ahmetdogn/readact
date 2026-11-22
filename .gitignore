@@ -17,3 +17,5 @@ video/
 docs/devpost-submission.md
 docs/thumbnail-*.png
 scripts/thumbnail.*
+docs/gallery/
+scripts/gallery.*

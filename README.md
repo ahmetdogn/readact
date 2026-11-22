@@ -10,7 +10,7 @@ Snap a photo of an official letter. Readact tells you what it means, what to do 
 Your name, address and account numbers are blacked out **on your device** before any cloud AI sees the text.
 
 [![Live demo](https://img.shields.io/badge/Live_demo-readact--app.web.app-0B0B0F?style=for-the-badge)](https://readact-app.web.app)
-[![Demo video](https://img.shields.io/badge/Demo_video-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](coming-soon!)
+[![Demo video](https://img.shields.io/badge/Demo_video-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/jRbQ9N6z6Fs)
 
 ![Firebase AI Logic](https://img.shields.io/badge/Firebase_AI_Logic-hybrid_inference-FFCA28?logo=firebase&logoColor=black)
 ![Gemini Nano](https://img.shields.io/badge/Gemini_Nano-on--device-4285F4?logo=googlechrome&logoColor=white)
