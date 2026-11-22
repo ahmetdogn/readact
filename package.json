@@ -1,0 +1,27 @@
+{
+  "name": "readact",
+  "version": "0.1.0",
+  "description": "Understand any official letter - privately. Hybrid on-device + cloud AI with Firebase AI Logic.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "tsx src/pii.test.ts && tsx src/deadline.test.ts && tsx src/fraud.test.ts",
+    "format": "prettier --write .",
+    "lint": "tsc --noEmit && prettier --check .",
+    "screenshots": "node scripts/screenshots.mjs"
+  },
+  "dependencies": {
+    "firebase": "^13.4.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.1",
+    "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.6"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "parameters": {
+    "cloud_expert_model": {
+      "defaultValue": {
+        "value": "gemini-3.6-flash"
+      },
+      "description": "Cloud model for expert legal help and reply drafts"
+    },
+    "cloud_fallback_model": {
+      "defaultValue": {
+        "value": "gemini-3.5-flash-lite"
+      },
+      "description": "Cloud model used when Gemini Nano is not available on the device"
+    }
+  }
+}

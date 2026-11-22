@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each (anonymous) user can only read and write their own deadline reminders.
+    match /users/{uid}/reminders/{id} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['title', 'date', 'description', 'createdAt'])
+        && request.resource.data.title is string && request.resource.data.title.size() < 300
+        && request.resource.data.date is string && request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.description is string && request.resource.data.description.size() < 1000;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
