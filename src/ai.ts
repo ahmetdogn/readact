@@ -9,11 +9,15 @@ import type { RuleFinding } from './fraud.ts';
 //   detectPiiOnDevice   ONLY_ON_DEVICE
 //   finalPrivacyCheck   ONLY_ON_DEVICE
 //   explain             PREFER_ON_DEVICE
-//   explainInCase       PREFER_ON_DEVICE
-//   extractDeadlines    PREFER_ON_DEVICE   (extraction only, dates are computed in deadline.ts)
-//   explainDeadline     PREFER_ON_DEVICE
-//   fakeCheck           PREFER_ON_DEVICE
-//   expertHelp          ONLY_IN_CLOUD
+//   extractDeadlines    PREFER_IN_CLOUD    (extraction only, dates are computed in deadline.ts)
+//   fakeCheck           PREFER_IN_CLOUD
+//   explainDeadline     PREFER_IN_CLOUD
+//   explainInCase       PREFER_IN_CLOUD
+//   expertHelp          PREFER_IN_CLOUD    (larger cloud model, Gemini Nano if the cloud fails)
+//
+// Gemini Nano handles one request at a time, so only the privacy steps and the main explanation
+// run on the device first. The heavier redacted steps go to the cloud and fall back to Nano when
+// the cloud is unreachable or rejects the request.
 //
 // Prompts are in English because Gemini Nano follows them more reliably; answers use the user's language.
 
@@ -381,7 +385,7 @@ Answer ONLY with JSON.
 
 LETTER:
 ${wrap(redactedText)}`;
-  return runJson<Extraction>(model(InferenceMode.PREFER_ON_DEVICE, { schema: DEADLINE_SCHEMA }), prompt);
+  return runJson<Extraction>(model(InferenceMode.PREFER_IN_CLOUD, { schema: DEADLINE_SCHEMA }), prompt);
 }
 
 export async function explainDeadline(
@@ -393,7 +397,7 @@ Purpose: ${p.purpose}. Last day: ${p.date} (${p.weekday}). Days left: ${p.daysLe
 Say what exactly must arrive at the authority by that day and that sending it a few days earlier is safer.
 ${p.purpose === 'widerspruch' ? 'Mention that a short letter "Ich lege Widerspruch ein, Begründung folgt" is enough to keep the deadline.' : ''}
 Plain text only.`;
-  const res = await model(InferenceMode.PREFER_ON_DEVICE, { outLang: lang }).generateContent(prompt);
+  const res = await model(InferenceMode.PREFER_IN_CLOUD, { outLang: lang }).generateContent(prompt);
   return { text: res.response.text().trim(), where: (res.response.inferenceSource as Where) ?? 'in_cloud' };
 }
 
@@ -427,7 +431,7 @@ For medium or high risk, advise not to pay yet and to contact the sender via an 
 
 LETTER:
 ${wrap(redactedText)}`;
-  return runJson<FakeCheck>(model(InferenceMode.PREFER_ON_DEVICE, { schema: FAKE_SCHEMA, outLang: lang }), prompt);
+  return runJson<FakeCheck>(model(InferenceMode.PREFER_IN_CLOUD, { schema: FAKE_SCHEMA, outLang: lang }), prompt);
 }
 
 export async function explainInCase(
@@ -454,7 +458,7 @@ Answer ONLY with JSON:
 - what_changed: what is different for the person now
 - case_status: open | waiting_for_authority | waiting_for_user | closed
 - timeline_entry: one line IN GERMAN for the history, max 12 words`;
-  return runJson<CaseContext>(model(InferenceMode.PREFER_ON_DEVICE, { schema: CASE_SCHEMA, outLang: lang }), prompt);
+  return runJson<CaseContext>(model(InferenceMode.PREFER_IN_CLOUD, { schema: CASE_SCHEMA, outLang: lang }), prompt);
 }
 
 export async function expertHelp(
@@ -463,7 +467,7 @@ export async function expertHelp(
   lang: string,
   question: string,
   redactor: Redactor,
-): Promise<string> {
+): Promise<{ text: string; where: Where }> {
   const prompt = `You help a person with no legal background understand an official letter and prepare their own reply.
 You do NOT give legal advice and you do NOT decide whether the letter is lawful. You explain, point out what the person
 could check themselves, show common options, and point to free professional help. The person decides.
@@ -483,10 +487,14 @@ SHORT SUMMARY ALREADY GIVEN: ${explanation.summary}
 LETTER:
 ${wrap(redactedText)}`;
   guard(prompt, redactor);
-  const res = await model(InferenceMode.ONLY_IN_CLOUD, { cloudModel: rcString('cloud_expert_model') }).generateContent(
-    prompt,
-  );
-  return redactor.restore(res.response.text());
+  const res = await model(InferenceMode.PREFER_IN_CLOUD, {
+    cloudModel: rcString('cloud_expert_model'),
+    outLang: lang,
+  }).generateContent(prompt);
+  return {
+    text: redactor.restore(res.response.text()),
+    where: (res.response.inferenceSource as Where) ?? 'in_cloud',
+  };
 }
 
 function guard(text: string, redactor: Redactor) {

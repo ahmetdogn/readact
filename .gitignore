@@ -6,3 +6,8 @@ dist
 *.log
 .DS_Store
 firebase-debug.log
+video/build/
+video/build.log
+video/.env
+video/voice-cache/
+video/out/

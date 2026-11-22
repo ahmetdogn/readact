@@ -1,5 +1,11 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { initializeAppCheck, ReCaptchaEnterpriseProvider, ReCaptchaV3Provider } from 'firebase/app-check';
+import {
+  getToken,
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  ReCaptchaV3Provider,
+  type AppCheck,
+} from 'firebase/app-check';
 import { getAI, GoogleAIBackend, type AI } from 'firebase/ai';
 import { getRemoteConfig, fetchAndActivate, getValue, type RemoteConfig } from 'firebase/remote-config';
 import { getAuth, signInAnonymously, type Auth } from 'firebase/auth';
@@ -27,6 +33,7 @@ export interface Services {
 }
 
 let services: Services | null = null;
+let appCheck: AppCheck | null = null;
 
 // Model names can be changed in Remote Config without a redeploy.
 const RC_DEFAULTS = {
@@ -51,7 +58,7 @@ export function initFirebase(): Services | null {
       ? new ReCaptchaEnterpriseProvider(env.VITE_RECAPTCHA_ENTERPRISE_KEY)
       : null;
   if (provider) {
-    initializeAppCheck(app, { provider, isTokenAutoRefreshEnabled: true });
+    appCheck = initializeAppCheck(app, { provider, isTokenAutoRefreshEnabled: true });
   } else {
     console.warn('[readact] No reCAPTCHA key set – App Check not initialised, cloud calls will fail.');
   }
@@ -79,4 +86,15 @@ export async function ensureUser(): Promise<string | null> {
   if (auth.currentUser) return auth.currentUser.uid;
   const cred = await signInAnonymously(auth);
   return cred.user.uid;
+}
+
+// Asks reCAPTCHA for a fresh assessment. Returns the error text if it still fails.
+export async function refreshAppCheck(): Promise<string | null> {
+  if (!appCheck) return null;
+  try {
+    await getToken(appCheck, true);
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
 }

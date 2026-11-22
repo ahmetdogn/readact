@@ -42,9 +42,10 @@ Most hybrid AI apps use the on-device model as a **fallback** for when there's n
 flowchart LR
     A[📷 Photo] --> B[Local OCR<br/><sub>tesseract.js, in the browser</sub>]
     B --> C{Privacy firewall<br/><sub>rules + Gemini Nano<br/>ONLY_ON_DEVICE</sub>}
-    C -->|"[NAME_1] [IBAN_1] …"| D[Explain · deadlines · scam check<br/><sub>PREFER_ON_DEVICE</sub>]
-    D -->|only if needed| E[Options + reply template<br/><sub>Gemini, ONLY_IN_CLOUD</sub>]
-    E --> F[Real details put back in<br/><sub>locally</sub>]
+    C -->|"[NAME_1] [IBAN_1] …"| D[Explain the letter<br/><sub>Gemini Nano first<br/>PREFER_ON_DEVICE</sub>]
+    C -->|redacted text| G[Deadlines · scam check · options<br/><sub>Gemini first, Nano as fallback<br/>PREFER_IN_CLOUD</sub>]
+    D --> F[Real details put back in<br/><sub>locally</sub>]
+    G --> F
     C -. user reviews and confirms .-> D
 ```
 
@@ -111,18 +112,18 @@ Plus: 10 answer languages, works offline with Gemini Nano, light and dark mode, 
 
 ## How Firebase AI Logic is used
 
-Every model call goes through the Firebase AI Logic Web SDK ([`src/ai.ts`](src/ai.ts)). Each step picks the inference mode that fits its privacy needs:
+Every model call goes through the Firebase AI Logic Web SDK ([`src/ai.ts`](src/ai.ts)). Readact uses **all four inference modes**, picked per step by what that step is allowed to see and by speed: Gemini Nano handles one request at a time, so it does the privacy work and the main explanation, while the heavier redacted steps run in the cloud in parallel and fall back to Nano when the cloud is unreachable.
 
-| Step                                      | Mode               | Why                                                                       |
-| ----------------------------------------- | ------------------ | ------------------------------------------------------------------------- |
-| Find personal data the rules missed       | `ONLY_ON_DEVICE`   | sees the letter before redaction is complete, must never leave the device |
-| Second privacy pass before any cloud call | `ONLY_ON_DEVICE`   | independent check right before sending                                    |
-| Explain the letter                        | `PREFER_ON_DEVICE` | fast and offline with Nano, cloud fallback gets redacted text only        |
-| Extract deadlines                         | `PREFER_ON_DEVICE` | extraction only, no date maths                                            |
-| Explain a deadline in calm words          | `PREFER_ON_DEVICE` | no personal data at all                                                   |
-| Scam wording check                        | `PREFER_ON_DEVICE` | gets the rule findings from code as input                                 |
-| Put a new letter in context of a case     | `PREFER_ON_DEVICE` | history is redacted with all secrets of the case                          |
-| Options + reply template                  | `ONLY_IN_CLOUD`    | needs the bigger model, receives redacted text only                       |
+| Step                                      | Mode               | Why                                                                                           |
+| ----------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| Find personal data the rules missed       | `ONLY_ON_DEVICE`   | sees the letter before redaction is complete, must never leave the device                     |
+| Second privacy pass before any cloud call | `ONLY_ON_DEVICE`   | independent check right before sending                                                        |
+| Explain the letter                        | `PREFER_ON_DEVICE` | fast and offline with Nano, cloud fallback gets redacted text only                            |
+| Extract deadlines                         | `PREFER_IN_CLOUD`  | extraction only, no date maths; runs in parallel while Nano explains                          |
+| Scam wording check                        | `PREFER_IN_CLOUD`  | gets the rule findings from code as input                                                     |
+| Explain a deadline in calm words          | `PREFER_IN_CLOUD`  | no personal data at all                                                                       |
+| Put a new letter in context of a case     | `PREFER_IN_CLOUD`  | history is redacted with all secrets of the case                                              |
+| Options + reply template                  | `PREFER_IN_CLOUD`  | bigger cloud model; Gemini Nano takes over if the cloud is unreachable or rejects the request |
 
 Structured output uses `responseConstraint` on device and `responseJsonSchema` in the cloud, with the same JSON schema. The UI shows for every result whether it was computed **on device** or **in the cloud (anonymised)**.
 

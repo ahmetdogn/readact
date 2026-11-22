@@ -136,11 +136,11 @@ export function holidays(year: number, state: State): Map<string, string> {
   return h;
 }
 
-const WEEKDAY_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function nonWorkingReason(x: Date, state: State): string | null {
   const wd = x.getUTCDay();
-  if (wd === 0 || wd === 6) return WEEKDAY_DE[wd];
+  if (wd === 0 || wd === 6) return WEEKDAY[wd];
   return holidays(x.getUTCFullYear(), state).get(iso(x)) ?? null;
 }
 
@@ -149,7 +149,7 @@ function nextWorkingDay(x: Date, state: State): { date: Date; reasons: string[] 
   let cur = x;
   let r: string | null;
   while ((r = nonWorkingReason(cur, state))) {
-    reasons.push(`${fmt(cur)} ist ${r}`);
+    reasons.push(`${fmt(cur)} is ${r}`);
     cur = addDays(cur, 1);
   }
   return { date: cur, reasons };
@@ -157,7 +157,7 @@ function nextWorkingDay(x: Date, state: State): { date: Date; reasons: string[] 
 
 export function fmt(x: Date | string): string {
   const v = typeof x === 'string' ? d(x) : x;
-  return `${WEEKDAY_DE[v.getUTCDay()].slice(0, 2)}, ${String(v.getUTCDate()).padStart(2, '0')}.${String(v.getUTCMonth() + 1).padStart(2, '0')}.${v.getUTCFullYear()}`;
+  return `${WEEKDAY[v.getUTCDay()].slice(0, 3)}, ${String(v.getUTCDate()).padStart(2, '0')}.${String(v.getUTCMonth() + 1).padStart(2, '0')}.${v.getUTCFullYear()}`;
 }
 
 export function daysBetween(fromIso: string, toIso: string): number {
@@ -184,7 +184,7 @@ export function computeDeadline(
   if (dl.kind === 'fixed_date') {
     if (!dl.fixed_date || !/^\d{4}-\d{2}-\d{2}$/.test(dl.fixed_date)) return null;
     end = d(dl.fixed_date);
-    steps.push(`Im Brief steht ein festes Datum: ${fmt(end)}.`);
+    steps.push(`The letter gives a fixed date: ${fmt(end)}.`);
   } else {
     if (!dl.period_amount || !dl.period_unit) return null;
 
@@ -193,54 +193,50 @@ export function computeDeadline(
     if (ex.delivery === 'zustellungsurkunde' || start === 'zustellung') {
       if (user.zustellung) {
         event = d(user.zustellung);
-        steps.push(`Zugestellt laut Umschlag am ${fmt(event)}.`);
+        steps.push(`Delivered on ${fmt(event)} (date on the envelope).`);
       } else {
         needsUserDate = 'zustellung';
         if (!ex.letter_date) return null;
         event = addDays(d(ex.letter_date), 1);
-        steps.push('Datum auf dem gelben Umschlag fehlt – vorläufig gerechnet ab dem Tag nach dem Briefdatum.');
+        steps.push('Date on the yellow envelope missing, counting from the day after the letter date for now.');
       }
     } else if (start === 'receipt') {
       if (user.receipt) {
         event = d(user.receipt);
-        steps.push(`Erhalten am ${fmt(event)}.`);
+        steps.push(`Received on ${fmt(event)}.`);
       } else {
         needsUserDate = 'receipt';
         event = d(today);
-        steps.push('Eingangsdatum fehlt – vorläufig gerechnet ab heute.');
+        steps.push('Date received missing, counting from today for now.');
       }
     } else if (start === 'letter_date') {
       if (!ex.letter_date) return null;
       event = d(ex.letter_date);
-      steps.push(`Frist läuft ab Briefdatum ${fmt(event)}.`);
+      steps.push(`The period starts on the letter date, ${fmt(event)}.`);
     } else {
       if (!ex.letter_date) return null;
       const posted = d(ex.letter_date);
       const raw = addDays(posted, 4);
       const moved = nextWorkingDay(raw, state);
       event = moved.date;
-      steps.push(`Briefdatum ${fmt(posted)} + 4 Tage Postlaufzeit (gilt seit 2025) = ${fmt(raw)}.`);
-      if (moved.reasons.length) steps.push(`${moved.reasons.join(', ')} → bekanntgegeben am ${fmt(event)}.`);
-      else steps.push(`Gilt als bekanntgegeben am ${fmt(event)}.`);
+      steps.push(`Letter date ${fmt(posted)} + 4 days for postal delivery (rule since 2025) = ${fmt(raw)}.`);
+      if (moved.reasons.length) steps.push(`${moved.reasons.join(', ')}, so it counts as received on ${fmt(event)}.`);
+      else steps.push(`Counts as received on ${fmt(event)}.`);
     }
 
     const n = dl.period_amount;
     if (dl.period_unit === 'months') end = addMonths(event, n);
     else if (dl.period_unit === 'weeks') end = addDays(event, 7 * n);
     else end = addDays(event, n);
-    const unitDe = {
-      days: n === 1 ? 'Tag' : 'Tage',
-      weeks: n === 1 ? 'Woche' : 'Wochen',
-      months: n === 1 ? 'Monat' : 'Monate',
-    }[dl.period_unit];
-    steps.push(`+ ${n} ${unitDe} = ${fmt(end)}.`);
+    const unit = { days: 'day', weeks: 'week', months: 'month' }[dl.period_unit];
+    steps.push(`+ ${n} ${unit}${n === 1 ? '' : 's'} = ${fmt(end)}.`);
   }
 
   const moved = nextWorkingDay(end, state);
   if (moved.reasons.length && dl.kind === 'period') {
     shifted = true;
     end = moved.date;
-    steps.push(`${moved.reasons.join(', ')} → Fristende verschiebt sich auf ${fmt(end)}.`);
+    steps.push(`${moved.reasons.join(', ')}, so the deadline moves to ${fmt(end)}.`);
   }
 
   // suggest sending three working days early

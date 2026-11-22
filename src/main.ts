@@ -41,7 +41,7 @@ import {
 } from './deadline.ts';
 import { daysUntil, deleteReminder, icsFor, listReminders, saveReminder, type Reminder } from './reminders.ts';
 import { ruleCheck, ruleRisk, type RuleFinding } from './fraud.ts';
-import { initFirebase, isConfigured } from './firebase.ts';
+import { initFirebase, isConfigured, refreshAppCheck } from './firebase.ts';
 import { occurrences, Redactor, type PiiEntity } from './pii.ts';
 import { SAMPLE_LETTER } from './sample.ts';
 
@@ -64,6 +64,8 @@ const state = {
   fake: null as { data: FakeCheck; where: Where } | null,
   features: null as LetterFeatures | null,
   match: null as Match | null,
+  run: 0,
+  pending: { deadlines: false, fake: false },
 };
 
 initFirebase();
@@ -279,6 +281,23 @@ $('hide-sel').onclick = () => {
   renderFirewall();
 };
 
+let appCheckRetries = 0;
+// One retry with a freshly requested App Check token. reCAPTCHA sometimes scores the very first
+// request of a session low; a second assessment a moment later usually passes.
+async function withCloudRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (!isAppCheckError(e)) throw e;
+    toast('Running the security check again…');
+    const still = await refreshAppCheck();
+    if (still) console.warn('[readact] App Check refresh failed:', still);
+    await new Promise((r) => setTimeout(r, 1200));
+    return await fn();
+  }
+}
+const isAppCheckError = (e: unknown) => /app.?check|attestation/i.test(e instanceof Error ? e.message : String(e));
+
 $('explain').onclick = async () => {
   const btn = $<HTMLButtonElement>('explain');
   if (!confirmBox.checked) return toast('Please confirm the check above first.');
@@ -303,31 +322,64 @@ $('explain').onclick = async () => {
 
     const redacted = state.redactor.redact(state.original);
     state.rules = ruleCheck(state.original); // needs the real IBAN etc., stays local
-    btn.innerHTML = '<span class="spinner"></span>Reading your letter…';
-
-    const [ex, dl, fc] = await Promise.allSettled([
-      explain(redacted, langSel.value, state.redactor),
-      extractDeadlines(redacted, state.redactor),
-      fakeCheck(redacted, state.rules, langSel.value, state.redactor),
-    ]);
-    if (ex.status === 'rejected') throw ex.reason;
+    const run = ++state.run;
     const track = (where: Where, chars: number) => (where === 'on_device' ? state.localRuns++ : countCloud(chars));
-    state.explanation = ex.value.data;
-    state.where = ex.value.where;
-    track(ex.value.where, redacted.length);
-    state.extraction = dl.status === 'fulfilled' ? dl.value.data : null;
-    if (dl.status === 'fulfilled') track(dl.value.where, redacted.length);
-    state.fake = fc.status === 'fulfilled' ? fc.value : null;
-    if (fc.status === 'fulfilled') track(fc.value.where, redacted.length);
+    state.extraction = null;
+    state.fake = null;
     state.userDates = {};
+    state.pending = { deadlines: true, fake: true };
 
+    // Deadlines and the scam check go to the cloud right away (redacted text) and run while
+    // Gemini Nano writes the explanation, so the user sees the first result much sooner.
+    const deadlines = extractDeadlines(redacted, state.redactor).catch((e) => (console.warn('deadlines', e), null));
+    const scam = fakeCheck(redacted, state.rules, langSel.value, state.redactor).catch(
+      (e) => (console.warn('scam', e), null),
+    );
+
+    btn.innerHTML = '<span class="spinner"></span>Explaining your letter…';
+    const ex = await explain(redacted, langSel.value, state.redactor);
+    state.explanation = ex.data;
+    state.where = ex.where;
+    track(ex.where, redacted.length);
+
+    appCheckRetries = 0;
     renderResult();
     $('step-result').hidden = false;
     $('step-expert').hidden = false;
     $('step-result').scrollIntoView({ behavior: 'smooth' });
-    explainPrimaryDeadline();
-    renderCaseMatch();
+
+    deadlines.then((r) => {
+      if (run !== state.run) return;
+      state.pending.deadlines = false;
+      if (r) {
+        state.extraction = r.data;
+        track(r.where, redacted.length);
+      }
+      state.computed = computeAll();
+      $('deadline-box').innerHTML = deadlinesHtml();
+      wireDeadlines();
+      explainPrimaryDeadline();
+      renderCaseMatch();
+      renderFlow();
+    });
+    scam.then((r) => {
+      if (run !== state.run) return;
+      state.pending.fake = false;
+      if (r) {
+        state.fake = r;
+        track(r.where, redacted.length);
+      }
+      $('fake-box').innerHTML = fakeHtml();
+      renderFlow();
+    });
   } catch (e) {
+    // A fresh reCAPTCHA token is often enough on the second try (e.g. right after page load).
+    if (isAppCheckError(e) && appCheckRetries++ < 1) {
+      toast('Running the security check again…');
+      await refreshAppCheck();
+      setTimeout(() => $('explain').click(), 1500);
+      return;
+    }
     toast(errMsg(e));
   } finally {
     done(btn);
@@ -374,6 +426,7 @@ function renderResult() {
 }
 
 function fakeHtml(): string {
+  if (state.pending.fake) return '<div class="fake ok"><span class="spinner"></span>Running the scam check…</div>';
   const fc = state.fake;
   const rules = state.rules.filter((r) => r.severity !== 'info');
   const info = state.rules.filter((r) => r.severity === 'info');
@@ -405,6 +458,7 @@ function fakeHtml(): string {
 }
 
 function deadlinesHtml(): string {
+  if (state.pending.deadlines) return '<p class="muted"><span class="spinner"></span>Calculating your deadlines…</p>';
   const ex = state.extraction;
   if (!ex) return '<p class="muted">Could not read deadlines from this letter – please check the letter yourself.</p>';
   const items = state.computed;
@@ -644,8 +698,14 @@ $('expert').onclick = async () => {
   const question = state.redactor.redact($<HTMLInputElement>('question').value.trim());
   busy(btn, 'Preparing your options…');
   try {
-    const md = await expertHelp(redacted, state.explanation, langSel.value, question, state.redactor);
-    countCloud(redacted.length + question.length);
+    const res = await withCloudRetry(() =>
+      expertHelp(redacted, state.explanation!, langSel.value, question, state.redactor),
+    );
+    const md = res.text;
+    $('expert-where').className = 'badge ' + (res.where === 'on_device' ? 'device' : 'cloud');
+    $('expert-where').textContent = res.where === 'on_device' ? 'Gemini Nano · on your device' : 'Cloud · anonymised';
+    if (res.where === 'on_device') state.localRuns++;
+    else countCloud(redacted.length + question.length);
     $('expert-out').innerHTML = markdown(md);
     $('expert-out')
       .querySelectorAll('.copy')
@@ -722,6 +782,7 @@ function markdown(md: string): string {
           .replace(/^```\w*\n?|```$/gm, '')
           .replace(/^\s*-{3,}\s*$/gm, '')
           .replace(/`([^`]+)`/g, '$1')
+          .replace(/\*\*/g, '')
           .trim();
         return `<h2>${esc(title)}</h2><button class="btn btn-ink small copy">Copy template</button><div class="draft">${esc(clean)}</div>`;
       }
@@ -789,10 +850,13 @@ function toast(msg: string) {
 function errMsg(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
   if (/app.?check|attestation/i.test(m)) {
-    const detail = m.match(/\(appCheck\/[\w-]+\)|HTTP status: \d+|attestation failed|not registered/i)?.[0] ?? '';
+    const detail =
+      m.match(/appCheck\/[\w-]+|HTTP status: \d+|attestation failed|not registered|throttled/i)?.[0] ??
+      m.replace(/^\[?FirebaseError\]?:?\s*/i, '').slice(0, 140);
+    console.warn('[readact] App Check error:', m);
     return location.hostname === 'localhost'
-      ? `App Check failed ${detail} – register your debug token in the Firebase console (see README).`
-      : `Security check (App Check) failed ${detail}. Please reload the page and try again.`;
+      ? `App Check failed (${detail}). Register your debug token in the Firebase console (see README).`
+      : `The security check failed (${detail}). Please reload, or open readact-app.web.app directly in Safari or Chrome.`;
   }
   return m.replace(/^\[?FirebaseError\]?:?\s*/i, '');
 }

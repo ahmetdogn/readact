@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Readact thumbnail</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@1&family=Inter+Tight:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #0b0b0f;
+        --paper: #fffdf7;
+        --hi: #ffe14d;
+        --w: 1500px;
+        --h: 1000px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        width: var(--w);
+        height: var(--h);
+        overflow: hidden;
+        background: var(--ink);
+        font-family: 'Inter Tight', sans-serif;
+        color: #f4f2ea;
+      }
+      .frame {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        align-items: center;
+        padding: 0 90px;
+        gap: 40px;
+        background:
+          radial-gradient(900px 600px at 85% 30%, #ffe14d1f, transparent 60%),
+          radial-gradient(700px 500px at 0% 100%, #3b5bfd22, transparent 60%), var(--ink);
+      }
+      .frame::after {
+        /* fine grid for depth */
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(#ffffff07 1px, transparent 1px), linear-gradient(90deg, #ffffff07 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(circle at 70% 50%, #000 0%, transparent 75%);
+        pointer-events: none;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 46px;
+      }
+      .brand img {
+        width: 76px;
+        height: 76px;
+        border-radius: 18px;
+        box-shadow: 0 0 0 2px #ffffff22;
+      }
+      .wordmark {
+        font-weight: 800;
+        font-size: 58px;
+        letter-spacing: -0.045em;
+      }
+      .wordmark span {
+        background: #f4f2ea;
+        color: var(--ink);
+        padding: 0 8px 2px;
+        margin-left: 3px;
+        border-radius: 7px;
+      }
+      h1 {
+        font-weight: 800;
+        font-size: 118px;
+        line-height: 0.94;
+        letter-spacing: -0.055em;
+      }
+      h1 em {
+        font-family: 'Instrument Serif', serif;
+        font-style: italic;
+        font-weight: 400;
+        font-size: 1.1em;
+        letter-spacing: -0.03em;
+      }
+      .bar {
+        display: inline-block;
+        background: var(--hi);
+        color: var(--ink);
+        padding: 0 14px 6px;
+        border-radius: 8px;
+        transform: rotate(-1.5deg);
+        margin-top: 26px;
+      }
+      .tags {
+        display: flex;
+        gap: 12px;
+        margin-top: 54px;
+        flex-wrap: wrap;
+      }
+      .tag {
+        font: 700 22px/1 'Inter Tight';
+        padding: 13px 18px;
+        border-radius: 999px;
+        border: 2px solid #ffffff2e;
+        color: #e8e6df;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .tag i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #4ade80;
+        box-shadow: 0 0 0 5px #4ade8033;
+      }
+
+      /* letter */
+      .visual {
+        position: relative;
+        height: 100%;
+        display: grid;
+        place-items: center;
+      }
+      .paper {
+        width: 560px;
+        padding: 48px 46px 52px;
+        background: var(--paper);
+        color: #17171c;
+        border-radius: 8px;
+        transform: rotate(3deg);
+        box-shadow:
+          0 60px 120px -30px #000,
+          0 0 0 1px #00000010;
+        font:
+          500 25px/1.55 'JetBrains Mono',
+          monospace;
+      }
+      .paper .top {
+        display: flex;
+        justify-content: space-between;
+        font-size: 19px;
+        color: #6b6a72;
+        margin-bottom: 26px;
+      }
+      .paper .top b {
+        color: #17171c;
+      }
+      .paper p {
+        margin: 0 0 10px;
+        white-space: nowrap;
+      }
+      .r {
+        display: inline-block;
+        background: #0b0b0f;
+        height: 26px;
+        vertical-align: -4px;
+        border-radius: 3px;
+      }
+      .subject {
+        font: 800 29px/1.2 'Inter Tight';
+        margin: 30px 0 16px !important;
+        white-space: normal !important;
+      }
+      .lines i {
+        display: block;
+        height: 12px;
+        border-radius: 6px;
+        background: #ebe7dc;
+        margin: 12px 0;
+      }
+      mark {
+        background: var(--hi);
+        padding: 0 4px;
+        border-radius: 3px;
+        color: #17171c;
+      }
+      .chip {
+        position: absolute;
+        background: #fff;
+        color: var(--ink);
+        border-radius: 22px;
+        padding: 20px 24px;
+        box-shadow: 0 30px 60px -20px #000c;
+        font: 700 26px/1.25 'Inter Tight';
+      }
+      .chip small {
+        display: block;
+        font: 700 15px/1 'Inter Tight';
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #6b6a72;
+        margin-bottom: 10px;
+      }
+      .chip code {
+        font: 700 24px 'JetBrains Mono';
+        background: var(--ink);
+        color: var(--hi);
+        padding: 3px 9px;
+        border-radius: 6px;
+      }
+      .c1 {
+        top: 13%;
+        right: -10px;
+        transform: rotate(-3deg);
+      }
+      .c2 {
+        bottom: 12%;
+        left: -30px;
+        transform: rotate(-2deg);
+      }
+      .c2 .days {
+        display: inline-block;
+        margin-top: 12px;
+        background: var(--ink);
+        color: var(--hi);
+        font-size: 20px;
+        padding: 6px 14px;
+        border-radius: 99px;
+      }
+
+      /* 16:9 variant for YouTube */
+      body.wide {
+        --w: 1600px;
+        --h: 900px;
+      }
+      body.wide .frame {
+        padding: 0 100px;
+      }
+      body.wide h1 {
+        font-size: 112px;
+      }
+      body.wide .paper {
+        width: 540px;
+        transform: rotate(3deg) scale(0.92);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div>
+        <div class="brand">
+          <img src="../public/icon.svg" alt="" />
+          <div class="wordmark">read<span>act</span></div>
+        </div>
+        <h1>
+          Every letter,<br /><em>explained.</em><br />
+          Your life,<br /><span class="bar">redacted.</span>
+        </h1>
+        <div class="tags">
+          <span class="tag"><i></i>Hybrid AI</span>
+          <span class="tag">Gemini Nano on-device</span>
+          <span class="tag">Firebase AI Logic</span>
+        </div>
+      </div>
+
+      <div class="visual">
+        <div class="paper">
+          <div class="top"><b>Finanzamt</b></div>
+          <p>Herrn <span class="r" style="width: 230px"></span></p>
+          <p><span class="r" style="width: 380px"></span></p>
+          <p>Steuer-ID <span class="r" style="width: 250px"></span></p>
+          <p class="subject">Bescheid über Einkommensteuer 2025</p>
+          <div class="lines"><i></i><i style="width: 86%"></i></div>
+          <p>Nachzahlung <mark>1.284,00 €</mark></p>
+          <p>bis zum <mark>21.12.2026</mark></p>
+          <div class="lines"><i style="width: 70%"></i></div>
+          <p>IBAN <span class="r" style="width: 360px"></span></p>
+        </div>
+        <div class="chip c1"><small>The cloud sees</small>Herrn <code>[NAME_1]</code></div>
+        <div class="chip c2">
+          <small>In plain words</small>You owe <b>€1,284</b>.<br />Pay or object by Dec 21.<br /><span class="days"
+            >29 days left</span
+          >
+        </div>
+      </div>
+    </div>
+    <script>
+      if (location.hash === '#wide') document.body.classList.add('wide');
+    </script>
+  </body>
+</html>
